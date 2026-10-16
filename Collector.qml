@@ -35,6 +35,7 @@ Item {
   property var diskWriteHistory: []
 
   property string gpuPath: ""
+  property string gpuKind: ""
   property bool hasGpu: false
   property real gpuBusy: 0
   property real gpuFreq: 0
@@ -129,7 +130,9 @@ Item {
 
     root._prevAt = now
 
-    if (root.gpuPath !== "") {
+    if (root.gpuKind === "nvidia") {
+      if (!nvidiaSmi.running) nvidiaSmi.running = true
+    } else if (root.gpuPath !== "") {
       var rc6 = readNumber(gpuRc6)
       var act = readNumber(gpuAct)
       root.hasGpu = !isNaN(rc6) || !isNaN(act)
@@ -191,12 +194,39 @@ Item {
     }
   }
 
-  // Locates the DRM card that exposes GPU frequency.
+  // Prefers the NVIDIA GPU when nvidia-smi reports values, otherwise the DRM card that exposes Intel frequency.
   Process {
-    id: findGpu
-    command: ["sh", "-c", "for c in /sys/class/drm/card[0-9]; do [ -e $c/gt_act_freq_mhz ] && echo $c && break; done"]
+    id: findGpuSource
+    command: ["sh", "-c",
+      "if out=$(nvidia-smi --query-gpu=utilization.gpu,clocks.current.graphics,clocks.max.graphics --format=csv,noheader,nounits 2>/dev/null) && [ -n \"$out\" ]; then echo nvidia; exit 0; fi; " +
+      "for c in /sys/class/drm/card[0-9]; do [ -e $c/gt_act_freq_mhz ] && echo intel $c && break; done"]
     stdout: StdioCollector {
-      onStreamFinished: root.gpuPath = text.trim()
+      onStreamFinished: {
+        var parts = text.trim().split(/\s+/)
+        root.gpuKind = parts[0] === "nvidia" ? "nvidia" : (parts[0] === "intel" ? "intel" : "")
+        root.gpuPath = root.gpuKind === "intel" ? parts[1] : ""
+      }
+    }
+  }
+
+  // NVIDIA utilization and frequencies are only exposed through nvidia-smi.
+  Process {
+    id: nvidiaSmi
+    command: ["nvidia-smi", "--query-gpu=utilization.gpu,clocks.current.graphics,clocks.max.graphics", "--format=csv,noheader,nounits"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var g = Model.parseNvidiaSmi(text)
+        if (!g) {
+          root.hasGpu = false
+          return
+        }
+        root.hasGpu = true
+        root.gpuBusy = g.busy
+        root.gpuFreq = g.freq
+        root.gpuMaxFreq = g.maxFreq
+        root.gpuHistory = Model.push(root.gpuHistory, root.gpuBusy, root.historyLength)
+        root.gpuFreqHistory = Model.push(root.gpuFreqHistory, root.gpuFreq, root.historyLength)
+      }
     }
   }
 
@@ -264,6 +294,6 @@ Item {
   Component.onCompleted: {
     findTemp.running = true
     findBattery.running = true
-    findGpu.running = true
+    findGpuSource.running = true
   }
 }

@@ -190,3 +190,25 @@ function parseUevent(text) {
   }
   return out
 }
+
+// Fields: utilization.gpu, clocks.current.graphics, clocks.max.graphics.
+// An unavailable field ("N/A") carries no number; busy and freq must parse or the sample is rejected.
+function parseNvidiaSmi(text) {
+  var f = String(text).trim().split("\n")[0].split(",")
+  if (f.length < 3) return null
+  var busy = _nvidiaNum(f[0])
+  var freq = _nvidiaNum(f[1])
+  if (isNaN(busy) || isNaN(freq)) return null
+  return { busy: busy, freq: freq, maxFreq: _nvidiaNum(f[2]) || 0 }
+}
+
+function _nvidiaNum(field) {
+  var s = String(field).replace(/[^0-9.]/g, "")
+  return s === "" ? NaN : Number(s)
+}
+
+function gpuSourceLabel(kind) {
+  if (kind === "nvidia") return "Reported by nvidia-smi on the NVIDIA GPU."
+  if (kind === "intel") return "Estimated from the time the GPU is not in RC6 power-down (no privileges needed)."
+  return ""
+}

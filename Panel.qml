@@ -346,14 +346,14 @@ Panel {
               MetricSection {
                 title: "Busy"
                 value: c && c.hasGpu ? Model.formatPercent(c.gpuBusy) : "n/a"
-                detail: "Estimated from the time the GPU is not in RC6 power-down (no privileges needed)."
+                detail: c ? Model.gpuSourceLabel(c.gpuKind) : ""
                 history: c ? c.gpuHistory : []
               }
 
               MetricSection {
                 title: "Frequency"
                 value: c && c.hasGpu ? Math.round(c.gpuFreq) + " MHz" : "n/a"
-                detail: c && c.hasGpu ? "Max " + Math.round(c.gpuMaxFreq) + " MHz" : ""
+                detail: c && c.hasGpu && c.gpuMaxFreq > 0 ? "Max " + Math.round(c.gpuMaxFreq) + " MHz" : ""
                 history: c ? c.gpuFreqHistory : []
                 graphMax: c && c.gpuMaxFreq > 0 ? c.gpuMaxFreq : 1200
               }

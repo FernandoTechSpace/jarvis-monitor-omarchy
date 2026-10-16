@@ -12,14 +12,14 @@ No sudo or pkexec is required. No network access.
 
 ## What it shows
 
-The bar widget displays CPU usage, memory usage and CPU temperature. The panel groups everything into nine categories, each with a summary card and a detail view:
+The bar widget displays CPU usage, memory usage and CPU temperature, plus GPU utilization when a GPU is readable (`nvidia-smi` on NVIDIA, Intel i915 sysfs otherwise). The panel groups everything into nine categories, each with a summary card and a detail view:
 
 | Category | Metrics |
 |---|---|
 | CPU | total usage, usage per thread, load average, history graph |
 | Memory | RAM, swap, zram stored and compressed size, compression ratio |
 | Temperature | CPU package temperature with history |
-| GPU | estimated busy percentage and current frequency (Intel i915) |
+| GPU | utilization percentage and current frequency, from `nvidia-smi` on NVIDIA, Intel i915 sysfs otherwise |
 | Network | download and upload totals with history, rates per interface |
 | Disk I/O | read and write throughput and busy percentage per physical disk |
 | Storage | used, free and total space per filesystem |
@@ -60,9 +60,10 @@ Read continuously on every interval (default 2 seconds):
 
 Short-lived child processes:
 
-- at startup, one `sh` call per run to locate the temperature sensor, the battery and the GPU card by name
+- at startup, one `sh` call per run to locate the temperature sensor, the battery and the GPU vendor (`nvidia-smi` first, then the first DRM card exposing Intel frequency)
 - `df` every 15 seconds for filesystem usage
 - `top` every 3 seconds, only while the panel is open, for the process lists
+- on NVIDIA, one `nvidia-smi --query-gpu=utilization.gpu,clocks.current.graphics,clocks.max.graphics` per refresh interval, never overlapping, only while the collector is running
 
 Middle click on the bar widget asks Omarchy to open `btop`, which must be available on the system.
 
@@ -121,7 +122,7 @@ omarchy plugin remove fernando.jarvis-monitor
 ## Requirements and limits
 
 - Omarchy with the shell plugin system.
-- GPU metrics rely on the Intel i915 sysfs interface. The busy value is estimated from the time the GPU is not in the RC6 power-down state, and the frequency reads 0 while it is idle.
+- GPU metrics prefer `nvidia-smi` (installed with the NVIDIA driver); utilization and clocks are read directly and the GPU shows as unavailable when a sample fails to parse. Without a usable `nvidia-smi`, the Intel i915 sysfs interface is used instead, where the busy value is estimated from the time the GPU is not in the RC6 power-down state and the frequency reads 0 while it is idle. On systems with several GPUs only the first one is reported.
 - Battery power draw is current multiplied by voltage, or `power_now` when the firmware provides it.
 - The process CPU percentage is per core, so 100 percent means one full core.
 

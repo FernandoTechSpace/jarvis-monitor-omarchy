@@ -14,6 +14,7 @@ BarWidget {
   readonly property string label: "󰻠 " + Model.formatPercent(collector.cpu)
     + "  󰍛 " + Model.formatPercent(collector.memPercent)
     + "  󰔏 " + Model.formatTemp(collector.temp)
+    + (collector.hasGpu ? "  󰢮 " + Model.formatPercent(collector.gpuBusy) : "")
 
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
 
